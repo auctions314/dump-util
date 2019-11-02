@@ -58,12 +58,16 @@ def main(argc, argv):
     sys.exit(1)
   offset = 0
   size = 0     # 0 is full-limit
-  dump(offset, size, argv[1:])
+  disp_filename = False
+  dump(offset, size, disp_filename, argv[1:])
 
-def dump(offset, size, files):
+def dump(offset, size, disp_filename, files):
   for file in files:
     with open(file, "rb") as fh:
+      if disp_filename:
+        printf("%s\n", file)
       hexdump(fh, offset, size)
+      printf("\n")
 
 def hexdump(fh, offset, size):
   fh.seek(offset, os.SEEK_SET)
@@ -77,9 +81,9 @@ def hexdump(fh, offset, size):
     if read_bytes <= 0:
       break
     printf("%08x: ", offset)
-    data.printHexU8()
-    printf("    ")
-    data.printASCII()
+    data.printHexU8(read_bytes)
+    printf("    " + "   " * (sizeof(data) - read_bytes))
+    data.printASCII(read_bytes)
     printf("\n")
     offset += sizeof(data)
 
