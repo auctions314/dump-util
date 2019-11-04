@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # coding: utf-8
-# for python 2.7 or 3.x
+# for python 2.7 or 3.2
 
 from __future__ import print_function  # for 3.x compatibility
-import sys
 import os
+from argparse import ArgumentParser
 from ctypes import LittleEndianStructure, Union, sizeof, \
                    c_uint32, c_uint16, c_uint8
 from curses.ascii import isprint
@@ -39,11 +39,11 @@ class BinaryData(Union):
   def printHex(self, unit, num):
     assert(unit in {1, 2, 4})
     if unit == 1:
-      printHexU8(num)
+      self.printHexU8(num)
     elif unit == 2:
-      printHexU16(num)
+      self.printHexU16(num)
     else:
-      printHexU32(num)
+      self.printHexU32(num)
 
   def printASCII(self, num = BYTES_PER_LINE):
     for i in range(num):
@@ -52,40 +52,40 @@ class BinaryData(Union):
 assert(sizeof(BinaryData) == BYTES_PER_LINE)
 
 #############################################################################
-def main(argc, argv):
-  if argc < 2:
-    printf("Usage: %s file...\n", os.path.basename(argv[0]))
-    sys.exit(1)
-  offset = 0
-  size = 0     # 0 is full-limit
-  disp_filename = False
-  dump(offset, size, disp_filename, argv[1:])
+def main():
+  parser = ArgumentParser()
+  parser.add_argument("files", nargs="+", metavar="file")
+  parser.add_argument("--version", action="version", version="0.1")
+  parser.add_argument("-v", "--verbose", action="store_true")
+  parser.add_argument("-s", "--skip", metavar="offset", default="0", type=int)
+  parser.add_argument("-n", "--num", metavar="length", default="-1", type=int)
+  args = parser.parse_args()
+  dump(args.skip, args.num, args.verbose, args.files)
 
-def dump(offset, size, disp_filename, files):
+def dump(offset, size, verbose, files):
   for file in files:
     with open(file, "rb") as fh:
-      if disp_filename:
-        printf("%s\n", file)
-      hexdump(fh, offset, size)
+      filesize = os.path.getsize(file)
+      if verbose:
+        printf("%s: %dbytes\n", file, filesize)
+      hexdump(fh, offset, filesize if size < 0 else size)
       printf("\n")
 
 def hexdump(fh, offset, size):
   fh.seek(offset, os.SEEK_SET)
-  if fh.tell() != offset:
-    printf("seek error. (request=%08x, result=%08x)¥n", offset, fh.tell())
-    return
-
   data = BinaryData()
-  while True:
+  while size > 0:
     read_bytes = fh.readinto(data)
     if read_bytes <= 0:
       break
+    n = min([read_bytes, size]) 
     printf("%08x: ", offset)
-    data.printHexU8(read_bytes)
-    printf("    " + "   " * (sizeof(data) - read_bytes))
-    data.printASCII(read_bytes)
+    data.printHex(1, n)
+    printf("    " + "   " * (sizeof(data) - n))
+    data.printASCII(n)
     printf("\n")
     offset += sizeof(data)
+    size -= n
 
 def printf(fmt, *args):
   if args:
@@ -93,11 +93,5 @@ def printf(fmt, *args):
   else:
     print(fmt, end="")
 
-def isAllSameVal(container, val):
-  for item in container:
-    if item != val:
-      return False
-  return True
-
 if __name__ == '__main__':
-  main(len(sys.argv), sys.argv)
+  main()
